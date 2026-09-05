@@ -59,7 +59,9 @@ struct SidePillView: View {
                     case .provider(let slot):
                         PillItem(
                             label: UsageFormat.percentOrDash(usage.state(for: slot).lastGood?.primary.percentUsed),
-                            selected: state.selection == row
+                            selected: state.selection == row,
+                            hovered: state.hoveredRow == row,
+                            anyHovered: state.hoveredRow != nil
                         ) {
                             UsageRing(
                                 provider: slot.kind,
@@ -71,7 +73,7 @@ struct SidePillView: View {
                         }
                         .accessibilityLabel(slot.title)
                     case .servers:
-                        PillItem(label: "\(ports.servers.count)", selected: state.selection == .servers) {
+                        PillItem(label: "\(ports.servers.count)", selected: state.selection == .servers, hovered: state.hoveredRow == .servers, anyHovered: state.hoveredRow != nil) {
                             ZStack {
                                 Circle().stroke(HUDColor.ringTrack, lineWidth: PillMetric.ringSize * 0.14)
                                 Image(systemName: "server.rack")
@@ -93,22 +95,32 @@ struct SidePillView: View {
     }
 }
 
+// The ring under the cursor lifts; the rest step back. Numbers roll.
 private struct PillItem<Ring: View>: View {
     let label: String
     let selected: Bool
+    var hovered = false
+    var anyHovered = false
     @ViewBuilder let ring: () -> Ring
+
+    private var receded: Bool { anyHovered && !hovered }
 
     var body: some View {
         VStack(spacing: PillMetric.ringLabelGap) {
             ring()
+                .scaleEffect(hovered ? 1.1 : 1)
             Text(label)
                 .font(.system(size: 12, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(HUDColor.textPrimary)
+                .contentTransition(.numericText())
+                .foregroundStyle(hovered || selected ? HUDColor.textPrimary : HUDColor.textPrimary.opacity(0.85))
                 .frame(height: PillMetric.labelHeight)
         }
         .frame(height: PillMetric.itemHeight)
-        .opacity(selected ? 1 : 0.9)
+        .opacity(receded ? 0.7 : 1)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovered)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: anyHovered)
+        .animation(.snappy(duration: 0.3), value: label)
     }
 }
 
@@ -125,7 +137,10 @@ struct GearButtonView: View {
             Image(systemName: "gearshape.fill")
                 .font(.system(size: PillMetric.gearSize, weight: .semibold))
                 .foregroundStyle(hovering ? HUDColor.textPrimary : HUDColor.icon.opacity(0.85))
+                .rotationEffect(.degrees(hovering ? 40 : 0))
         }
+        .scaleEffect(hovering ? 1.08 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.65), value: hovering)
         .frame(width: PillMetric.gearDiameter, height: PillMetric.gearDiameter)
         .contentShape(Circle())
         .onHover { hovering = $0 }

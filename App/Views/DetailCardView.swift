@@ -37,6 +37,7 @@ struct DetailCardView: View {
     let ports: PortsStore
     let actions: ServerActions
     var activity: ActivityStore? = nil
+    @State private var appeared = false
 
     var body: some View {
         Group {
@@ -47,6 +48,10 @@ struct DetailCardView: View {
                 DevServersCard(ports: ports, actions: actions)
             }
         }
+        // Switching rings crossfades the content; the bubble stays.
+        .id(selection)
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .animation(.snappy(duration: 0.18), value: selection)
         .frame(width: PillMetric.cardWidth, alignment: .leading)
         .padding(16)
         .padding(pointerEdge == .right ? .trailing : .leading, PillMetric.cardPointerWidth)
@@ -55,6 +60,13 @@ struct DetailCardView: View {
                 .fill(HUDColor.notchBackground)
                 .overlay(CardBubbleShape(pointerY: pointerY, pointerEdge: pointerEdge).stroke(Color.white.opacity(0.08), lineWidth: 1))
         )
+        // Springs out of the pill's side: scale from the tail, slide 8 pt.
+        .scaleEffect(appeared ? 1 : 0.96, anchor: pointerEdge == .right ? .trailing : .leading)
+        .offset(x: appeared ? 0 : (pointerEdge == .right ? 8 : -8))
+        .opacity(appeared ? 1 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) { appeared = true }
+        }
         .preferredColorScheme(.dark)
     }
 }
@@ -187,6 +199,9 @@ private struct WindowRow: View {
             UsageBar(provider: provider, percentUsed: window.percentUsed)
             Text("\(UsageFormat.percent(window.percentUsed)) Used")
                 .font(.system(size: 11))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.snappy(duration: 0.3), value: window.percentUsed)
                 .foregroundStyle(HUDColor.textSecondary)
         }
     }

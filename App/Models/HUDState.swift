@@ -17,6 +17,8 @@ final class HUDState {
     // Pill rows top to bottom: one per provider slot, then the servers badge.
     var rows: [HUDSelection] = [.servers]
     var placement = PillPlacement.load()
+    // The ring under the cursor, for the lift; nil when the cursor is elsewhere.
+    var hoveredRow: HUDSelection?
     var selection: HUDSelection?
     var isRevealed = false
     // Mirror of the login-item status, refreshed when a menu opens.

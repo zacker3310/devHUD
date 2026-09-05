@@ -84,6 +84,7 @@ private struct ServerRow: View {
                 .padding(-4)
         )
         .onHover { hovering = $0 }
+        .animation(.snappy(duration: 0.2), value: hovering)
         .onTapGesture {
             // The one outward action in the app: open a web UI or API root.
             if let url = server.url { NSWorkspace.shared.open(url) }
@@ -116,11 +117,13 @@ private struct ServerRow: View {
                     IconButton(symbol: "arrow.clockwise", help: "Restart", enabled: server.cwd != nil) { actions.restart(server) }
                     IconButton(symbol: "xmark.circle", help: "Kill", enabled: true, destructive: true) { actions.requestKill(server) }
                 }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             } else {
                 Text(metrics)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(HUDColor.textSecondary)
                     .lineLimit(1)
+                    .transition(.opacity)
             }
         }
     }

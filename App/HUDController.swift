@@ -255,10 +255,11 @@ final class HUDController: NSObject, NSMenuDelegate {
         reposition(animated: true)
     }
 
+    // Ease-out with a touch of overshoot: the pill lands, it does not stop.
     private func animate(_ panel: NSPanel, to frame: NSRect) {
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.28
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.duration = 0.32
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.34, 1.4, 0.64, 1.0)
             panel.animator().setFrame(frame, display: true)
         }
     }
@@ -369,6 +370,11 @@ final class HUDController: NSObject, NSMenuDelegate {
         let target = HoverResolver.resolve(location: NSEvent.mouseLocation, pillFrame: pillPanel.frame, cardFrame: cardFrame, gearFrame: gearFrame, rows: state.rows)
         guard target != hoverTarget else { return }
         hoverTarget = target
+        if case .pill(let item) = target {
+            state.hoveredRow = item
+        } else if target == .none || target == .gear {
+            state.hoveredRow = nil
+        }
         switch target {
         case .none:
             if state.selection != nil { scheduleClose() }
