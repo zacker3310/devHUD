@@ -1,0 +1,61 @@
+name: devHUD
+options:
+  bundleIdPrefix: cloud.acker
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.3.1"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: "YES"
+    # Local test build only: ad-hoc signature, no team, no sandbox, no hardened
+    # runtime. Developer ID + notarization is Phase 5 in TASKS.md.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_APP_SANDBOX: "NO"
+    SWIFT_STRICT_CONCURRENCY: minimal
+  configs:
+    Debug:
+      ENABLE_HARDENED_RUNTIME: "NO"
+    Release:
+      # Library validation and no debugger attach: a process holding two OAuth
+      # tokens in memory does not get to be injected into. Notarization needs it.
+      ENABLE_HARDENED_RUNTIME: "YES"
+
+targets:
+  devHUD:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cloud.acker.devhud
+        INFOPLIST_FILE: App/Info.plist
+
+  devHUDTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+    dependencies:
+      - target: devHUD
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cloud.acker.devhud.tests
+
+schemes:
+  devHUD:
+    build:
+      targets:
+        devHUD: all
+    test:
+      config: Debug
+      targets:
+        - devHUDTests
+    run:
+      config: Debug
