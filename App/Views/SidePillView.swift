@@ -45,6 +45,7 @@ struct SidePillShape: Shape {
 struct SidePillView: View {
     let usage: AIUsageStore
     let ports: PortsStore
+    let docker: DockerStore
     let activity: ActivityStore
     let state: HUDState
 
@@ -73,7 +74,7 @@ struct SidePillView: View {
                         }
                         .accessibilityLabel(slot.title)
                     case .servers:
-                        PillItem(label: "\(ports.servers.count)", selected: state.selection == .servers, hovered: state.hoveredRow == .servers, anyHovered: state.hoveredRow != nil) {
+                        PillItem(label: "\(ports.servers.count + docker.containers.count)", selected: state.selection == .servers, hovered: state.hoveredRow == .servers, anyHovered: state.hoveredRow != nil) {
                             ZStack {
                                 Circle().stroke(HUDColor.ringTrack, lineWidth: PillMetric.ringSize * 0.14)
                                 Image(systemName: "server.rack")

@@ -2,3 +2,4 @@
 cat > scripts/release.sh <<'EOF'
 #!/usr/bin/env bash
 # Build, sign, 
+2026-09-05T18:08:46Z BLOCK deploy-gate package publish | unauthorized | cd ~/dev/devHUD && export RELEASE_AUTHORIZED="Zac, in chat 2026-09-05: go ahead and make another release in github"; gh 

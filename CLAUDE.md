@@ -67,6 +67,10 @@ Filter xcodebuild with `grep -E " error:|BUILD (SUCCEEDED|FAILED)"`. The
   badge pins on click. Gear menu and right-click offer Hide for 1 Hour.
 - Cursor: `CursorUsageProvider` reads the session from Cursor's SQLite state
   store read-only and asks cursor.com's usage summary; no slot without a token.
+- Docker (`App/Docker`): `docker ps --format '{{json .}}'` every 5 s and
+  `docker stats --no-stream` every 15 s through the CLI found in fixed paths.
+  Containers are a section of the Dev Servers card; the badge counts them. A
+  non-zero exit means the daemon is off and is shown as one quiet line.
 - Claude accounts: one `ClaudeUsageProvider` per Claude Code config directory.
   Discovery: `claudeConfigDirs` in UserDefaults if set, else `$CLAUDE_CONFIG_DIR`,
   `~/.claude`, and any `~/.claude-*` holding `.credentials.json`. To add the work

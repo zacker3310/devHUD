@@ -35,6 +35,7 @@ struct DetailCardView: View {
     var pointerEdge: PillEdge = .right
     let usage: AIUsageStore
     let ports: PortsStore
+    var docker: DockerStore? = nil
     let actions: ServerActions
     var activity: ActivityStore? = nil
     @State private var appeared = false
@@ -45,7 +46,7 @@ struct DetailCardView: View {
             case .provider(let slot):
                 ProviderDetailView(slot: slot, state: usage.state(for: slot), sessions: activity?.summary(for: slot.kind))
             case .servers:
-                DevServersCard(ports: ports, actions: actions)
+                DevServersCard(ports: ports, actions: actions, docker: docker)
             }
         }
         // Switching rings crossfades the content; the bubble stays.
