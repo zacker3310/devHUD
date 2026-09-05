@@ -13,6 +13,9 @@ permissions:
 
 jobs:
   release:
+    # Without a signing identity the job would only produce an ad-hoc zip that
+    # Gatekeeper blocks; skip cleanly until the secrets exist.
+    if: ${{ vars.DEVHUD_SIGN_IDENTITY != '' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
