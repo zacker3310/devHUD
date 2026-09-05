@@ -1,0 +1,4 @@
+2026-09-05T13:17:28Z BLOCK deploy-gate package publish | unauthorized | mkdir -p packaging/homebrew/Casks .github/workflows
+cat > scripts/release.sh <<'EOF'
+#!/usr/bin/env bash
+# Build, sign, 
