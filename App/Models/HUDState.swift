@@ -4,6 +4,8 @@ import Observation
 enum HUDSelection: Hashable {
     case provider(ProviderSlot)
     case servers
+    case github
+    case vercel
 
     var slot: ProviderSlot? {
         if case .provider(let slot) = self { return slot }
@@ -39,9 +41,12 @@ enum PillMetric {
     // Kind order for the pill; slots of the same kind keep discovery order.
     static let kindOrder: [ProviderID] = [.claude, .copilot, .codex, .cursor]
 
-    static func rows(for slots: [ProviderSlot]) -> [HUDSelection] {
+    static func rows(for slots: [ProviderSlot], github: Bool = false, vercel: Bool = false) -> [HUDSelection] {
         let ordered = kindOrder.flatMap { kind in slots.filter { $0.kind == kind } }
-        return ordered.map(HUDSelection.provider) + [.servers]
+        var rows = ordered.map(HUDSelection.provider) + [.servers]
+        if github { rows.append(.github) }
+        if vercel { rows.append(.vercel) }
+        return rows
     }
 
     // Sized against the Codenotch demo frame: ring about 40 pt, bold white

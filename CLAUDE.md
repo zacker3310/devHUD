@@ -71,6 +71,11 @@ Filter xcodebuild with `grep -E " error:|BUILD (SUCCEEDED|FAILED)"`. The
   `docker stats --no-stream` every 15 s through the CLI found in fixed paths.
   Containers are a section of the Dev Servers card; the badge counts them. A
   non-zero exit means the daemon is off and is shown as one quiet line.
+- Watch rows (`App/Watch`): Vercel through `vercel ls --json` (run via
+  `/bin/zsh -lc`, since the CLI needs node on PATH) every 120 s, 30 s while a
+  build runs; GitHub through `gh api` (notifications, review requests, your
+  PRs, latest run on the four most recently pushed repos) every 120 s. The app
+  holds no token for either; the CLIs do. No CLI, no row.
 - Claude accounts: one `ClaudeUsageProvider` per Claude Code config directory.
   Discovery: `claudeConfigDirs` in UserDefaults if set, else `$CLAUDE_CONFIG_DIR`,
   `~/.claude`, and any `~/.claude-*` holding `.credentials.json`. To add the work

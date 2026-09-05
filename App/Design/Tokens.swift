@@ -31,6 +31,17 @@ enum HUDColor {
 
     static let waiting = copilot
 
+    // Circle stroke for a watch row: quiet track, yellow while busy, orange
+    // when something failed.
+    static func watch(_ state: WatchItem.State) -> Color {
+        switch state {
+        case .ok: return ringTrack
+        case .busy: return copilot
+        case .attention: return copilot
+        case .failed: return claude
+        }
+    }
+
 }
 
 enum HUDMetric {

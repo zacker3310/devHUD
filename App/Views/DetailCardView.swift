@@ -36,6 +36,8 @@ struct DetailCardView: View {
     let usage: AIUsageStore
     let ports: PortsStore
     var docker: DockerStore? = nil
+    var github: GitHubStore? = nil
+    var vercel: VercelStore? = nil
     let actions: ServerActions
     var activity: ActivityStore? = nil
     @State private var appeared = false
@@ -47,6 +49,10 @@ struct DetailCardView: View {
                 ProviderDetailView(slot: slot, state: usage.state(for: slot), sessions: activity?.summary(for: slot.kind))
             case .servers:
                 DevServersCard(ports: ports, actions: actions, docker: docker)
+            case .github:
+                WatchCard(title: "GitHub", imageName: "brand-github", summary: github?.summary ?? WatchSummary(items: []), error: github?.lastError, empty: "Nothing waiting on you")
+            case .vercel:
+                WatchCard(title: "Vercel", imageName: "brand-vercel", summary: vercel?.summary ?? WatchSummary(items: []), error: vercel?.lastError, empty: "No deployments")
             }
         }
         // Switching rings crossfades the content; the bubble stays.
@@ -205,5 +211,100 @@ private struct WindowRow: View {
                 .animation(.snappy(duration: 0.3), value: window.percentUsed)
                 .foregroundStyle(HUDColor.textSecondary)
         }
+    }
+}
+
+// Deployments, PRs, runs, notifications: one row each, newest first, click to open.
+struct WatchCard: View {
+    let title: String
+    let imageName: String
+    let summary: WatchSummary
+    let error: String?
+    let empty: String
+    let maxRows = 10
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(imageName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(HUDColor.icon)
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(HUDColor.textPrimary)
+                Spacer()
+                Text(headline)
+                    .font(.system(size: 11))
+                    .foregroundStyle(summary.failed > 0 ? HUDColor.claude : HUDColor.textSecondary)
+            }
+            if let error {
+                Text("-- \(error)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HUDColor.textSecondary)
+            } else if summary.items.isEmpty {
+                Text(empty)
+                    .font(.system(size: 12))
+                    .foregroundStyle(HUDColor.textSecondary)
+                    .padding(.vertical, 6)
+            }
+            ForEach(summary.items.prefix(maxRows)) { item in
+                WatchRow(item: item)
+            }
+            if summary.items.count > maxRows {
+                Text("+\(summary.items.count - maxRows) more")
+                    .font(.system(size: 11))
+                    .foregroundStyle(HUDColor.textSecondary)
+            }
+        }
+    }
+
+    private var headline: String {
+        var parts: [String] = []
+        if summary.failed > 0 { parts.append("\(summary.failed) failed") }
+        if summary.busy > 0 { parts.append("\(summary.busy) building") }
+        if summary.attention > 0 { parts.append("\(summary.attention) waiting") }
+        return parts.isEmpty ? "all clear" : parts.joined(separator: " · ")
+    }
+}
+
+private struct WatchRow: View {
+    let item: WatchItem
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Circle()
+                .fill(HUDColor.watch(item.state) == HUDColor.ringTrack ? HUDColor.codex : HUDColor.watch(item.state))
+                .frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HUDColor.textPrimary)
+                    .lineLimit(1)
+                Text(item.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(HUDColor.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if let at = item.at, let age = UsageFormat.uptime(since: at) {
+                Text(age)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(HUDColor.textSecondary)
+            }
+            if item.url != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(hovering ? HUDColor.textPrimary : HUDColor.textSecondary)
+            }
+        }
+        .contentShape(Rectangle())
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.white.opacity(hovering ? 0.06 : 0)).padding(-4))
+        .onHover { hovering = $0 }
+        .animation(.snappy(duration: 0.2), value: hovering)
+        .onTapGesture { if let url = item.url { NSWorkspace.shared.open(url) } }
     }
 }

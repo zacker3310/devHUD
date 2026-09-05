@@ -20,12 +20,18 @@ so a reader can decide whether to run it.
 - `https://api.anthropic.com/api/oauth/usage` with the Claude token as a Bearer header.
 - `https://api.github.com/copilot_internal/user` with the gh token.
 - `http://127.0.0.1:<port>/`, one GET per listening port, to classify it.
+- Through the CLIs you are already signed into, never with a token of its own:
+  `vercel ls --json` (api.vercel.com) and `gh api` (api.github.com) for
+  deployments, notifications, pull requests and workflow runs; `docker ps` and
+  `docker stats` on the local daemon.
 
 Nothing else. No telemetry, no crash reporting, no update check.
 
 ## What it executes
 
-- `/usr/sbin/lsof`, `gh auth token`, `open -a <editor|Terminal> <cwd>`.
+- `/usr/sbin/lsof`, `gh auth token`, `gh api <fixed paths>`, `/bin/zsh -lc "vercel ls --json"`
+  (a fixed string, nothing interpolated), `docker ps|stats|stop|restart <id>`,
+  `open -a <editor|Terminal> <cwd>`.
 - On an explicit click, `kill(pid, SIGTERM)` then `SIGKILL`, only after
   re-checking the process start time so a reused pid is never signalled.
 - On an explicit click, a restart re-runs the process's exact argv (read from

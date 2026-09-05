@@ -46,6 +46,8 @@ struct SidePillView: View {
     let usage: AIUsageStore
     let ports: PortsStore
     let docker: DockerStore
+    let github: GitHubStore
+    let vercel: VercelStore
     let activity: ActivityStore
     let state: HUDState
 
@@ -82,6 +84,14 @@ struct SidePillView: View {
                                     .foregroundStyle(HUDColor.icon)
                             }
                             .frame(width: PillMetric.ringSize, height: PillMetric.ringSize)
+                        }
+                    case .github:
+                        PillItem(label: "\(github.summary.badge)", selected: state.selection == .github, hovered: state.hoveredRow == .github, anyHovered: state.hoveredRow != nil) {
+                            WatchCircle(imageName: "brand-github", state: github.summary.worst)
+                        }
+                    case .vercel:
+                        PillItem(label: "\(vercel.summary.badge)", selected: state.selection == .vercel, hovered: state.hoveredRow == .vercel, anyHovered: state.hoveredRow != nil) {
+                            WatchCircle(imageName: "brand-vercel", state: vercel.summary.worst)
                         }
                     }
                 }
@@ -148,5 +158,25 @@ struct GearButtonView: View {
         .onTapGesture(perform: onTap)
         .accessibilityLabel("devHUD menu")
         .preferredColorScheme(.dark)
+    }
+}
+
+// A brand mark in a circle whose stroke says whether anything needs a look.
+struct WatchCircle: View {
+    let imageName: String
+    let state: WatchItem.State
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(HUDColor.watch(state), lineWidth: PillMetric.ringSize * 0.14)
+                .animation(.smooth(duration: 0.4), value: state)
+            Image(imageName)
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: PillMetric.ringSize * 0.42, height: PillMetric.ringSize * 0.42)
+                .foregroundStyle(HUDColor.icon)
+        }
+        .frame(width: PillMetric.ringSize, height: PillMetric.ringSize)
     }
 }

@@ -15,6 +15,8 @@ final class HUDController: NSObject, NSMenuDelegate {
     let ports: PortsStore
     let actions: ServerActions
     let docker = DockerStore()
+    let github = GitHubStore()
+    let vercel = VercelStore()
     let activity = ActivityStore()
     let state = HUDState()
     // A pinned card ignores the hover timers until unpinned.
@@ -71,15 +73,17 @@ final class HUDController: NSObject, NSMenuDelegate {
         portless.start()
         ports.start()
         docker.start()
+        github.start()
+        vercel.start()
         activity.start()
         usage.agentsActive = activity.anyActive
         usage.start()
         observeActivity()
 
-        state.rows = PillMetric.rows(for: usage.slots)
+        state.rows = PillMetric.rows(for: usage.slots, github: github.isInstalled, vercel: vercel.isInstalled)
         let size = NSSize(width: PillMetric.pillWidth, height: PillMetric.windowHeight(rows: state.rows.count))
         let panel = HUDPanel(contentRect: NSRect(origin: .zero, size: size))
-        let root = SidePillView(usage: usage, ports: ports, docker: docker, activity: activity, state: state)
+        let root = SidePillView(usage: usage, ports: ports, docker: docker, github: github, vercel: vercel, activity: activity, state: state)
         let host = HUDHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
@@ -157,6 +161,8 @@ final class HUDController: NSObject, NSMenuDelegate {
         case "conceal": conceal()
         case "close": closeCard()
         case "select:servers": open(.servers)
+        case "select:github": open(.github)
+        case "select:vercel": open(.vercel)
         case "gear:show": showGear()
         case "hidehour": hideForAnHour()
         case "unhide": unhide()
@@ -523,7 +529,7 @@ final class HUDController: NSObject, NSMenuDelegate {
         let ringScreenY = pill.maxY - PillMetric.ringCenterY(index: index)
         // Measure with a throwaway hosting controller (the hosting view reports
         // no size with sizing options off), display in a first-mouse-aware view.
-        let provisional = DetailCardView(selection: selection, pointerY: PillMetric.cardPointerInset, pointerEdge: state.placement.edge, usage: usage, ports: ports, docker: docker, actions: actions, activity: activity)
+        let provisional = DetailCardView(selection: selection, pointerY: PillMetric.cardPointerInset, pointerEdge: state.placement.edge, usage: usage, ports: ports, docker: docker, github: github, vercel: vercel, actions: actions, activity: activity)
         let size = NSHostingController(rootView: provisional).sizeThatFits(in: CGSize(width: 1000, height: 3000))
         let placement = PillMetric.cardPlacement(
             ringCenterScreenY: ringScreenY,
@@ -531,7 +537,7 @@ final class HUDController: NSObject, NSMenuDelegate {
             screenMinY: screen.frame.minY,
             screenMaxY: screen.frame.maxY
         )
-        let content = DetailCardView(selection: selection, pointerY: placement.pointerY, pointerEdge: state.placement.edge, usage: usage, ports: ports, docker: docker, actions: actions, activity: activity)
+        let content = DetailCardView(selection: selection, pointerY: placement.pointerY, pointerEdge: state.placement.edge, usage: usage, ports: ports, docker: docker, github: github, vercel: vercel, actions: actions, activity: activity)
         let host = cardHost ?? HUDHostingView(rootView: content)
         host.rootView = content
         host.sizingOptions = []

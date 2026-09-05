@@ -14,4 +14,5 @@ First release intended for other Macs.
 - Claude token read from the login keychain, where Claude Code keeps it fresh; the file is the fallback.
 - Motion: hovered ring lifts while the others recede, numbers roll, the card springs out from the pill and crossfades between rings, the pill's slide overshoots a touch, the gear turns on hover, server actions slide in.
 - Docker containers in the servers card: name, compose project, image, published ports, health, CPU and memory; restart, stop with confirm, click to open a web port. The badge counts them.
+- Vercel and GitHub rows: latest deployment per project; notifications, review requests, your PRs, latest CI run per active repo. Circle turns yellow while something builds, orange when something failed. Click opens it.
 - Homebrew cask and release pipeline.
