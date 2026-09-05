@@ -572,8 +572,10 @@ final class HUDController: NSObject, NSMenuDelegate {
 
     // MARK: pin and hide
 
-    // Click a ring to keep its card open; click it again to let go.
+    // Provider cards are hover-only. Only the servers card pins on click,
+    // because its rows carry buttons the cursor has to travel to.
     func togglePin(_ selection: HUDSelection) {
+        guard selection == .servers else { return }
         if pinned == selection {
             pinned = nil
             if hoverTarget == .none { closeCard() } else { scheduleClose() }

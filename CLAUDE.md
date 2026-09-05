@@ -63,8 +63,8 @@ Filter xcodebuild with `grep -E " error:|BUILD (SUCCEEDED|FAILED)"`. The
   agent is live, 300 s otherwise.
 - Ring colour is the usage band (`UsageBand`: ample, watch, critical,
   exhausted); the brand mark identifies the provider. Stale or rate-limited
-  readings dim to 55 percent. Click a ring to pin its card; gear menu and
-  right-click offer Hide for 1 Hour.
+  readings dim to 55 percent. Provider cards are hover-only; only the servers
+  badge pins on click. Gear menu and right-click offer Hide for 1 Hour.
 - Cursor: `CursorUsageProvider` reads the session from Cursor's SQLite state
   store read-only and asks cursor.com's usage summary; no slot without a token.
 - Claude accounts: one `ClaudeUsageProvider` per Claude Code config directory.
