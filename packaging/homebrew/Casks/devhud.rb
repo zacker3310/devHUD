@@ -1,6 +1,6 @@
 cask "devhud" do
   version "0.3.1"
-  sha256 "cf8c95c21dfd63203da25d3ab235c0dd1cd0bd99c7721e3fe03d4f17579b2556"
+  sha256 "8915b6fdcdd3cb0cb481a9cf3987e32a9f7113606c11061e3aaef08cbad35e26"
 
   url "https://github.com/zacker3310/devHUD/releases/download/v#{version}/devHUD-#{version}.zip"
   name "devHUD"

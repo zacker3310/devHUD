@@ -9,7 +9,7 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "0.3.1"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "12"
     GENERATE_INFOPLIST_FILE: "YES"
     # Local test build only: ad-hoc signature, no team, no sandbox, no hardened
     # runtime. Developer ID + notarization is Phase 5 in TASKS.md.
