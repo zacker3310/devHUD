@@ -42,7 +42,7 @@ final class HUDController: NSObject, NSMenuDelegate {
     #endif
 
     static let concealDelay: Duration = .seconds(0.8)
-    static let closeDelay: Duration = .seconds(0.35)
+    static let closeDelay: Duration = .seconds(0.2)
 
     override init() {
         var providers: [any UsageProvider] = ClaudeUsageProvider.discovered()
