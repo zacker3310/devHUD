@@ -1,0 +1,70 @@
+name: release
+
+# Builds, signs, notarizes and publishes devHUD when a v* tag is pushed.
+# Secrets: DEVELOPER_ID_P12 (base64 .p12), DEVELOPER_ID_P12_PASSWORD,
+# NOTARY_KEY (base64 AuthKey .p8), NOTARY_KEY_ID, NOTARY_ISSUER_ID.
+# Variable: DEVHUD_SIGN_IDENTITY ("Developer ID Application: Zac Acker (E97LU2X2VL)").
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tools
+        run: brew install xcodegen
+
+      - name: Import signing identity
+        env:
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          echo "$P12" | base64 --decode > /tmp/devid.p12
+          security create-keychain -p ci build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p ci build.keychain
+          security import /tmp/devid.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci build.keychain
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Notary credentials
+        env:
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          echo "$NOTARY_KEY" | base64 --decode > /tmp/AuthKey.p8
+          xcrun notarytool store-credentials devhud-notary --key /tmp/AuthKey.p8 --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID"
+
+      - name: Build, sign, notarize, package
+        env:
+          DEVHUD_SIGN_IDENTITY: ${{ vars.DEVHUD_SIGN_IDENTITY }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # The tag exists already, so the script exits 2 at its own tagging
+          # step after building, notarizing and packaging.
+          scripts/release.sh "$VERSION" || test $? -eq 2
+          test -f "dist/devHUD-$VERSION.zip"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_AUTHORIZED: "tag push by ${{ github.actor }}"
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" "dist/devHUD-$VERSION.zip" "dist/devHUD-$VERSION.zip.sha256" \
+            --title "devHUD $VERSION" --notes-file CHANGELOG.md
+
+      - name: Cask for the tap
+        uses: actions/upload-artifact@v4
+        with:
+          name: cask
+          path: packaging/homebrew/Casks/devhud.rb
