@@ -4,6 +4,7 @@ enum ProviderID: String, CaseIterable, Identifiable, Sendable {
     case claude
     case codex
     case copilot
+    case cursor
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum ProviderID: String, CaseIterable, Identifiable, Sendable {
         case .claude: return "Claude"
         case .codex: return "Codex"
         case .copilot: return "Copilot"
+        case .cursor: return "Cursor"
         }
     }
 
@@ -21,6 +23,25 @@ enum ProviderID: String, CaseIterable, Identifiable, Sendable {
         case .claude: return "brand-claude"
         case .codex: return "brand-openai"
         case .copilot: return "brand-copilot"
+        case .cursor: return "brand-cursor"
+        }
+    }
+}
+
+// How close a window is to its limit. Colour names the state; the glyph
+// names the provider.
+enum UsageBand: Equatable, Sendable {
+    case ample
+    case watch
+    case critical
+    case exhausted
+
+    init(percentUsed: Double) {
+        switch percentUsed {
+        case ..<50: self = .ample
+        case ..<70: self = .watch
+        case ..<100: self = .critical
+        default: self = .exhausted
         }
     }
 }
@@ -54,6 +75,14 @@ struct ProviderState: Sendable {
     var nextAttempt: Date?
 
     var hasData: Bool { lastGood != nil }
+
+    // A reading older than an hour, or one the provider refused to refresh,
+    // is shown dimmed rather than hidden.
+    func isStale(now: Date = Date()) -> Bool {
+        if let nextAttempt, nextAttempt > now { return true }
+        guard let lastGood else { return false }
+        return now.timeIntervalSince(lastGood.fetchedAt) > 3600
+    }
 
     // What the card says under a provider with no fresh data.
     func statusText(now: Date = Date()) -> String? {

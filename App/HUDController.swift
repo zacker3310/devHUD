@@ -14,7 +14,13 @@ final class HUDController: NSObject, NSMenuDelegate {
     let portless: PortlessStore
     let ports: PortsStore
     let actions: ServerActions
+    let activity = ActivityStore()
     let state = HUDState()
+    // A pinned card ignores the hover timers until unpinned.
+    private var pinned: HUDSelection?
+    // Hide for an hour: no reveal until this passes.
+    private var hiddenUntil: Date?
+    private var activityObservation: Task<Void, Never>?
 
     private var pillPanel: HUDPanel?
     private var pillHost: NSView?
@@ -42,6 +48,7 @@ final class HUDController: NSObject, NSMenuDelegate {
         var providers: [any UsageProvider] = ClaudeUsageProvider.discovered()
         providers.append(CopilotUsageProvider())
         providers.append(CodexUsageProvider())
+        if let cursor = CursorUsageProvider.discovered() { providers.append(cursor) }
         usage = AIUsageStore(providers: providers)
         portless = PortlessStore()
         ports = PortsStore(portless: portless)
@@ -62,12 +69,15 @@ final class HUDController: NSObject, NSMenuDelegate {
     func start() {
         portless.start()
         ports.start()
+        activity.start()
+        usage.agentsActive = activity.anyActive
         usage.start()
+        observeActivity()
 
         state.rows = PillMetric.rows(for: usage.slots)
         let size = NSSize(width: PillMetric.pillWidth, height: PillMetric.windowHeight(rows: state.rows.count))
         let panel = HUDPanel(contentRect: NSRect(origin: .zero, size: size))
-        let root = SidePillView(usage: usage, ports: ports, state: state)
+        let root = SidePillView(usage: usage, ports: ports, activity: activity, state: state)
         let host = HUDHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
@@ -111,6 +121,21 @@ final class HUDController: NSObject, NSMenuDelegate {
         HUDLog.hud.info("side pill up, autoHide=\(self.state.autoHide) loginItem=\(LoginItem.statusText, privacy: .public)")
     }
 
+    // The usage poll cadence follows whether any agent is mid-turn.
+    private func observeActivity() {
+        activityObservation?.cancel()
+        activityObservation = Task { [weak self] in
+            while let self, !Task.isCancelled {
+                let active = self.activity.anyActive
+                if active != self.usage.agentsActive {
+                    self.usage.agentsActive = active
+                    HUDLog.usage.info("agents active=\(active), usage interval \(self.usage.interval)s")
+                }
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
     #if DEBUG
     // Test hook for driving the state machine without Accessibility rights:
     // post "cloud.acker.devhud.action" with object reveal | conceal | close |
@@ -131,6 +156,11 @@ final class HUDController: NSObject, NSMenuDelegate {
         case "close": closeCard()
         case "select:servers": open(.servers)
         case "gear:show": showGear()
+        case "hidehour": hideForAnHour()
+        case "unhide": unhide()
+        case let a where a.hasPrefix("pin:"):
+            if let kind = ProviderID(rawValue: String(a.dropFirst(4))),
+               let row = state.rows.first(where: { $0.slot?.kind == kind }) { togglePin(row) }
         case "dock:left": setEdge(.left)
         case "dock:right": setEdge(.right)
         case "position:reset": resetPlacement()
@@ -266,6 +296,13 @@ final class HUDController: NSObject, NSMenuDelegate {
         }) {
             mouseMonitors.append(upLocal)
         }
+        if let rightClick = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown, handler: { [weak self] event in
+            guard let self, event.window === self.pillPanel || event.window === self.gearPanel else { return event }
+            Task { @MainActor in self.showMenu() }
+            return nil
+        }) {
+            mouseMonitors.append(rightClick)
+        }
         if let upGlobal = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .leftMouseDragged], handler: { [weak self] event in
             Task { @MainActor in
                 if event.type == .leftMouseUp { self?.dragEnded() } else { self?.dragMoved() }
@@ -312,7 +349,13 @@ final class HUDController: NSObject, NSMenuDelegate {
     private func dragEnded() {
         guard let drag else { return }
         self.drag = nil
-        guard drag.moved else { return }
+        guard drag.moved else {
+            // A click that did not move: on a ring it pins that ring's card.
+            if case .pill(.some(let row)) = HoverResolver.resolve(location: NSEvent.mouseLocation, pillFrame: pillPanel?.frame ?? .zero, cardFrame: nil, rows: state.rows) {
+                togglePin(row)
+            }
+            return
+        }
         let location = NSEvent.mouseLocation
         let target = NSScreen.screens.first { $0.frame.contains(location) } ?? screen
         guard let target else { return }
@@ -396,6 +439,7 @@ final class HUDController: NSObject, NSMenuDelegate {
     // MARK: reveal / conceal
 
     func reveal() {
+        if let hiddenUntil, hiddenUntil > Date() { return }
         concealTask?.cancel()
         guard let pillPanel, !state.isRevealed, let frame = pillFrame(revealed: true) else { return }
         state.isRevealed = true
@@ -414,7 +458,7 @@ final class HUDController: NSObject, NSMenuDelegate {
     // Conceal only once the cursor has left both the pill and the card.
     private func scheduleConceal() {
         concealTask?.cancel()
-        guard state.autoHide, !menuOpen, hoverTarget == .none else { return }
+        guard state.autoHide, !menuOpen, hoverTarget == .none, pinned == nil else { return }
         concealTask = Task { [weak self] in
             try? await Task.sleep(for: HUDController.concealDelay)
             guard !Task.isCancelled else { return }
@@ -445,6 +489,8 @@ final class HUDController: NSObject, NSMenuDelegate {
     private func open(_ selection: HUDSelection) {
         closeTask?.cancel()
         reveal()
+        // A pinned card stays put while the cursor crosses other rings.
+        if let pinned, pinned != selection { return }
         guard state.selection != selection else { return }
         state.selection = selection
         placeCard(for: selection)
@@ -452,6 +498,7 @@ final class HUDController: NSObject, NSMenuDelegate {
 
     private func scheduleClose() {
         closeTask?.cancel()
+        guard pinned == nil else { return }
         closeTask = Task { [weak self] in
             try? await Task.sleep(for: HUDController.closeDelay)
             guard !Task.isCancelled, let self else { return }
@@ -468,7 +515,7 @@ final class HUDController: NSObject, NSMenuDelegate {
         let ringScreenY = pill.maxY - PillMetric.ringCenterY(index: index)
         // Measure with a throwaway hosting controller (the hosting view reports
         // no size with sizing options off), display in a first-mouse-aware view.
-        let provisional = DetailCardView(selection: selection, pointerY: PillMetric.cardPointerInset, pointerEdge: state.placement.edge, usage: usage, ports: ports, actions: actions)
+        let provisional = DetailCardView(selection: selection, pointerY: PillMetric.cardPointerInset, pointerEdge: state.placement.edge, usage: usage, ports: ports, actions: actions, activity: activity)
         let size = NSHostingController(rootView: provisional).sizeThatFits(in: CGSize(width: 1000, height: 3000))
         let placement = PillMetric.cardPlacement(
             ringCenterScreenY: ringScreenY,
@@ -476,7 +523,7 @@ final class HUDController: NSObject, NSMenuDelegate {
             screenMinY: screen.frame.minY,
             screenMaxY: screen.frame.maxY
         )
-        let content = DetailCardView(selection: selection, pointerY: placement.pointerY, pointerEdge: state.placement.edge, usage: usage, ports: ports, actions: actions)
+        let content = DetailCardView(selection: selection, pointerY: placement.pointerY, pointerEdge: state.placement.edge, usage: usage, ports: ports, actions: actions, activity: activity)
         let host = cardHost ?? HUDHostingView(rootView: content)
         host.rootView = content
         host.sizingOptions = []
@@ -515,6 +562,44 @@ final class HUDController: NSObject, NSMenuDelegate {
                 if self.state.selection == nil { cardPanel.orderOut(nil) }
             }
         })
+    }
+
+    // MARK: pin and hide
+
+    // Click a ring to keep its card open; click it again to let go.
+    func togglePin(_ selection: HUDSelection) {
+        if pinned == selection {
+            pinned = nil
+            if hoverTarget == .none { closeCard() } else { scheduleClose() }
+            return
+        }
+        pinned = nil
+        open(selection)
+        pinned = selection
+    }
+
+    func hideForAnHour() {
+        hiddenUntil = Date().addingTimeInterval(3600)
+        pinned = nil
+        dismissCard()
+        if state.isRevealed, state.autoHide {
+            conceal()
+        } else if let pillPanel, let frame = pillFrame(revealed: false) {
+            state.isRevealed = false
+            hideGear()
+            animate(pillPanel, to: frame)
+        }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3600))
+            self?.unhide()
+        }
+    }
+
+    func unhide() {
+        hiddenUntil = nil
+        if !state.autoHide { reveal() }
+        hoverTarget = .none
+        cursorMoved()
     }
 
     // MARK: menu
@@ -567,6 +652,10 @@ final class HUDController: NSObject, NSMenuDelegate {
         reset.target = self
         menu.addItem(reset)
         menu.addItem(.separator())
+        let hide = NSMenuItem(title: "Hide for 1 Hour", action: #selector(hideHour), keyEquivalent: "")
+        hide.target = self
+        menu.addItem(hide)
+        menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit devHUD", action: #selector(quit), keyEquivalent: "")
         quit.target = self
         menu.addItem(quit)
@@ -598,6 +687,7 @@ final class HUDController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleKeepVisible() { setAutoHide(!state.autoHide) }
+    @objc private func hideHour() { hideForAnHour() }
     @objc private func dockLeft() { setEdge(.left) }
     @objc private func dockRight() { setEdge(.right) }
     @objc private func resetPosition() { resetPlacement() }

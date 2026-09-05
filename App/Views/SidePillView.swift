@@ -45,6 +45,7 @@ struct SidePillShape: Shape {
 struct SidePillView: View {
     let usage: AIUsageStore
     let ports: PortsStore
+    let activity: ActivityStore
     let state: HUDState
 
     var body: some View {
@@ -60,7 +61,13 @@ struct SidePillView: View {
                             label: UsageFormat.percentOrDash(usage.state(for: slot).lastGood?.primary.percentUsed),
                             selected: state.selection == row
                         ) {
-                            UsageRing(provider: slot.kind, percentUsed: usage.state(for: slot).lastGood?.primary.percentUsed, size: PillMetric.ringSize)
+                            UsageRing(
+                                provider: slot.kind,
+                                percentUsed: usage.state(for: slot).lastGood?.primary.percentUsed,
+                                size: PillMetric.ringSize,
+                                stale: usage.state(for: slot).isStale(),
+                                activity: activity.summary(for: slot.kind)?.state
+                            )
                         }
                         .accessibilityLabel(slot.title)
                     case .servers:

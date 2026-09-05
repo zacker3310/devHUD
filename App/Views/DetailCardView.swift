@@ -36,12 +36,13 @@ struct DetailCardView: View {
     let usage: AIUsageStore
     let ports: PortsStore
     let actions: ServerActions
+    var activity: ActivityStore? = nil
 
     var body: some View {
         Group {
             switch selection {
             case .provider(let slot):
-                ProviderDetailView(slot: slot, state: usage.state(for: slot))
+                ProviderDetailView(slot: slot, state: usage.state(for: slot), sessions: activity?.summary(for: slot.kind))
             case .servers:
                 DevServersCard(ports: ports, actions: actions)
             }
@@ -61,6 +62,7 @@ struct DetailCardView: View {
 struct ProviderDetailView: View {
     let slot: ProviderSlot
     let state: ProviderState
+    var sessions: ActivitySummary? = nil
     private var provider: ProviderID { slot.kind }
 
     var body: some View {
@@ -92,6 +94,9 @@ struct ProviderDetailView: View {
                     .foregroundStyle(HUDColor.textSecondary)
                     .lineLimit(2)
             }
+            if let sessions {
+                SessionsSection(summary: sessions)
+            }
         }
     }
 
@@ -100,6 +105,62 @@ struct ProviderDetailView: View {
         if let next = state.nextAttempt, next > Date() { return "rate limited" }
         if let stale = UsageFormat.staleText(snapshot.fetchedAt) { return stale }
         return snapshot.planLabel ?? ""
+    }
+}
+
+// Every live session for this provider: what it is doing and where.
+private struct SessionsSection: View {
+    let summary: ActivitySummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Sessions")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(HUDColor.textPrimary)
+                Spacer()
+                Text(summary.label)
+                    .font(.system(size: 11))
+                    .foregroundStyle(summary.state == .waiting ? HUDColor.waiting : HUDColor.textSecondary)
+            }
+            ForEach(summary.sessions) { session in
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(dot(session.state))
+                        .frame(width: 6, height: 6)
+                    Text(session.name)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(HUDColor.textPrimary)
+                        .lineLimit(1)
+                    Text([session.surface, session.folder].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.system(size: 11))
+                        .foregroundStyle(HUDColor.textSecondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(stateText(session))
+                        .font(.system(size: 11))
+                        .foregroundStyle(session.state == .waiting ? HUDColor.waiting : HUDColor.textSecondary)
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func dot(_ state: AgentSession.State) -> Color {
+        switch state {
+        case .busy: return HUDColor.textPrimary
+        case .waiting: return HUDColor.waiting
+        case .idle: return HUDColor.ringTrack
+        }
+    }
+
+    private func stateText(_ session: AgentSession) -> String {
+        let since = UsageFormat.uptime(since: session.since) ?? ""
+        switch session.state {
+        case .busy: return "working \(since)"
+        case .waiting: return "waiting \(since)"
+        case .idle: return "idle \(since)"
+        }
     }
 }
 

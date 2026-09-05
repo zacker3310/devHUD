@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 enum ClaudeUsageDecoder {
     static let labels: [String: String] = [
@@ -95,6 +96,9 @@ struct ClaudeUsageProvider: UsageProvider {
         return dirName == ".claude" ? "Claude" : "Claude (\(dirName.replacingOccurrences(of: ".claude", with: "").trimmingCharacters(in: CharacterSet(charactersIn: "-_"))))"
     }
 
+    // From the file only: this runs at launch on the main thread, and a
+    // keychain read there would block startup behind the access prompt. The
+    // plan name does not go stale the way the token does.
     private static func subscriptionType(at url: URL) -> String? {
         guard let data = FileManager.default.contents(atPath: url.path),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -144,6 +148,9 @@ struct ClaudeUsageProvider: UsageProvider {
         request.setValue("devHUD/0.1", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 20
         let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            throw ProviderError.missingCredentials("token rejected, sign in again in Claude Code")
+        }
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             #if DEBUG
             NSLog("claude usage HTTP %d retry-after=%@ ratelimit=%@ body=%@", http.statusCode,
@@ -156,15 +163,52 @@ struct ClaudeUsageProvider: UsageProvider {
         return try ClaudeUsageDecoder.decode(data)
     }
 
-    // Read-only. Claude Code owns and refreshes this file.
+    // Read-only. On macOS Claude Code keeps the live token in the login
+    // keychain ("Claude Code-credentials") and refreshes it there; the file in
+    // the config directory can be a stale copy, so it is the fallback.
     private func readToken() throws -> String {
+        if ClaudeUsageProvider.isDefaultConfigDir(credentialsURL),
+           let data = ClaudeUsageProvider.keychainCredentials(),
+           let token = try? ClaudeUsageProvider.token(fromCredentialsJSON: data) {
+            return token
+        }
         guard let data = try? Data(contentsOf: credentialsURL) else {
             throw ProviderError.missingCredentials("\(credentialsURL.path) not readable")
         }
+        return try ClaudeUsageProvider.token(fromCredentialsJSON: data)
+    }
+
+    static func isDefaultConfigDir(_ credentialsURL: URL) -> Bool {
+        credentialsURL.deletingLastPathComponent().lastPathComponent == ".claude"
+    }
+
+    static let keychainService = "Claude Code-credentials"
+
+    // The first read prompts once for keychain access; an ad-hoc build asks
+    // again after every rebuild because its signature changed.
+    static func keychainCredentials() -> Data? {
+        // The access prompt is modal; under XCTest it would hang the runner.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return nil }
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching([
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: keychainService,
+            kSecReturnData: true,
+            kSecMatchLimit: kSecMatchLimitOne,
+        ] as CFDictionary, &item)
+        guard status == errSecSuccess else { return nil }
+        return item as? Data
+    }
+
+    // The same JSON shape lives in the keychain item and in the file.
+    static func token(fromCredentialsJSON data: Data) throws -> String {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let oauth = root["claudeAiOauth"] as? [String: Any],
               let token = oauth["accessToken"] as? String, !token.isEmpty else {
             throw ProviderError.missingCredentials("no claudeAiOauth.accessToken")
+        }
+        if let expires = oauth["expiresAt"] as? Double, expires / 1000 < Date().timeIntervalSince1970 {
+            throw ProviderError.missingCredentials("token expired, open Claude Code to refresh it")
         }
         return token
     }

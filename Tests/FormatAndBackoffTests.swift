@@ -12,11 +12,16 @@ final class FormatAndBackoffTests: XCTestCase {
     }
 
     func testResetText() {
-        XCTAssertNil(UsageFormat.resetText(nil, now: now))
-        XCTAssertEqual(UsageFormat.resetText(now.addingTimeInterval(51 * 60), now: now), "Resets in 51 min")
-        XCTAssertEqual(UsageFormat.resetText(now.addingTimeInterval(3 * 3600 + 12 * 60), now: now), "Resets in 3h 12m")
-        XCTAssertEqual(UsageFormat.resetText(now.addingTimeInterval(2 * 86400 + 4 * 3600), now: now), "Resets in 2d 4h")
-        XCTAssertEqual(UsageFormat.resetText(now.addingTimeInterval(-5), now: now), "Resets now")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Indiana/Indianapolis")!
+        // 2027-01-15 08:00 local (a Friday)
+        let base = calendar.date(from: DateComponents(year: 2027, month: 1, day: 15, hour: 8))!
+        XCTAssertNil(UsageFormat.resetText(nil, now: base, calendar: calendar))
+        XCTAssertEqual(UsageFormat.resetText(base.addingTimeInterval(51 * 60), now: base, calendar: calendar), "Resets in 51 min")
+        XCTAssertEqual(UsageFormat.resetText(base.addingTimeInterval(3 * 3600 + 12 * 60), now: base, calendar: calendar), "Resets Fri 11:12 AM")
+        XCTAssertEqual(UsageFormat.resetText(base.addingTimeInterval(2 * 86400), now: base, calendar: calendar), "Resets Sun 8:00 AM")
+        XCTAssertEqual(UsageFormat.resetText(base.addingTimeInterval(9 * 86400), now: base, calendar: calendar), "Resets Jan 24")
+        XCTAssertEqual(UsageFormat.resetText(base.addingTimeInterval(-5), now: base, calendar: calendar), "Resets now")
     }
 
     func testStaleText() {

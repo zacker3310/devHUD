@@ -25,6 +25,8 @@ struct DevHUDApp: App {
                     Button(screen.localizedName) { delegate.controller.setScreen(name: screen.localizedName) }
                 }
             }
+            Button("Hide for 1 Hour") { delegate.controller.hideForAnHour() }
+            Button("Show Now") { delegate.controller.unhide() }
             Button("Refresh Now") { delegate.controller.refresh() }
                 .keyboardShortcut("r")
             Divider()

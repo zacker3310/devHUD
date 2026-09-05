@@ -9,17 +9,21 @@ enum UsageFormat {
         value.map(percent) ?? "--"
     }
 
-    // "Resets in 51 min", "Resets in 3h 12m", "Resets in 2d 4h".
-    static func resetText(_ resetsAt: Date?, now: Date = Date()) -> String? {
+    // Relative inside the hour, a weekday and time inside the week, a date
+    // beyond that: "Resets in 51 min", "Resets Thu 12:00 AM", "Resets Sep 10".
+    static func resetText(_ resetsAt: Date?, now: Date = Date(), calendar: Calendar = .current) -> String? {
         guard let resetsAt else { return nil }
         let seconds = resetsAt.timeIntervalSince(now)
         if seconds <= 0 { return "Resets now" }
-        let minutes = Int(seconds / 60)
+        let minutes = Int((seconds / 60).rounded())
         if minutes < 60 { return "Resets in \(max(minutes, 1)) min" }
-        let hours = minutes / 60
-        if hours < 24 { return "Resets in \(hours)h \(minutes % 60)m" }
-        let days = hours / 24
-        return "Resets in \(days)d \(hours % 24)h"
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: resetsAt)).day ?? 0
+        formatter.dateFormat = days >= 7 ? "MMM d" : "E h:mm a"
+        return "Resets \(formatter.string(from: resetsAt))"
     }
 
     // Codex data comes from the last session, which may be days old.

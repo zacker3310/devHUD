@@ -16,7 +16,11 @@ final class AIUsageStore {
     private(set) var states: [String: ProviderState] = [:]
 
     let providers: [any UsageProvider]
-    let interval: TimeInterval = 120
+    // Poll faster while an agent is actually running; the numbers only move then.
+    static let activeInterval: TimeInterval = 120
+    static let idleInterval: TimeInterval = 300
+    var agentsActive = false
+    var interval: TimeInterval { agentsActive ? AIUsageStore.activeInterval : AIUsageStore.idleInterval }
     private var tasks: [String: Task<Void, Never>] = [:]
 
     var slots: [ProviderSlot] { providers.map(\.slot) }

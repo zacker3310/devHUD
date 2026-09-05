@@ -49,6 +49,24 @@ Filter xcodebuild with `grep -E " error:|BUILD (SUCCEEDED|FAILED)"`. The
 - Stores (`App/Stores`, `App/Portless`) are `@MainActor @Observable` classes with
   one `Task` poll loop each. Providers are `Sendable` structs that only return values.
   A provider instance is a `ProviderSlot`; `ProviderID` is the kind (color, mark).
+- Claude token: on macOS Claude Code keeps the live OAuth token in the login
+  keychain item "Claude Code-credentials" and refreshes it there; the
+  `.credentials.json` file can be a stale copy. `ClaudeUsageProvider` reads the
+  keychain first (never at launch on the main thread, never under XCTest,
+  because the access prompt is modal) and falls back to the file. The first
+  read prompts; ad-hoc builds prompt again after every rebuild.
+- Live sessions (`App/Sessions`): Claude Code writes `~/.claude/sessions/<pid>.json`
+  with cwd, status (busy | waiting), startedAt and name; `ActivityStore` keeps
+  the ones whose pid is alive with a matching start time and treats a Codex
+  rollout written in the last 8 s as busy. The ring shows a spinning arc while
+  working and pulses amber while waiting; usage polls every 120 s while any
+  agent is live, 300 s otherwise.
+- Ring colour is the usage band (`UsageBand`: ample, watch, critical,
+  exhausted); the brand mark identifies the provider. Stale or rate-limited
+  readings dim to 55 percent. Click a ring to pin its card; gear menu and
+  right-click offer Hide for 1 Hour.
+- Cursor: `CursorUsageProvider` reads the session from Cursor's SQLite state
+  store read-only and asks cursor.com's usage summary; no slot without a token.
 - Claude accounts: one `ClaudeUsageProvider` per Claude Code config directory.
   Discovery: `claudeConfigDirs` in UserDefaults if set, else `$CLAUDE_CONFIG_DIR`,
   `~/.claude`, and any `~/.claude-*` holding `.credentials.json`. To add the work

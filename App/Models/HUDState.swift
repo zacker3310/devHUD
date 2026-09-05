@@ -35,7 +35,7 @@ final class HUDState {
 // and hit-test the cursor without measuring views. Points, y from the top.
 enum PillMetric {
     // Kind order for the pill; slots of the same kind keep discovery order.
-    static let kindOrder: [ProviderID] = [.claude, .copilot, .codex]
+    static let kindOrder: [ProviderID] = [.claude, .copilot, .codex, .cursor]
 
     static func rows(for slots: [ProviderSlot]) -> [HUDSelection] {
         let ordered = kindOrder.flatMap { kind in slots.filter { $0.kind == kind } }

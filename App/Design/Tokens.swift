@@ -16,8 +16,21 @@ enum HUDColor {
         case .claude: return claude
         case .codex: return codex
         case .copilot: return copilot
+        case .cursor: return icon
         }
     }
+
+    // Ring and bar colour by how close the window is to its limit.
+    static func band(_ band: UsageBand) -> Color {
+        switch band {
+        case .ample: return codex
+        case .watch: return copilot
+        case .critical, .exhausted: return claude
+        }
+    }
+
+    static let waiting = copilot
+
 }
 
 enum HUDMetric {
